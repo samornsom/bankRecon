@@ -24,9 +24,9 @@ const getLevenshteinDistance = (a: string, b: string): number => {
 const isPotentialTransposition = (amount1: number, amount2: number): boolean => {
     const diff = Math.abs(amount1 - amount2);
     // Standard accounting rule: Transposition errors are divisible by 9
-    // Also check if they have same set of digits for stronger confidence? 
-    // For now, strict div by 9 and within specific ratio range
     if (diff === 0) return false;
+    // Check if diff is divisible by 9 (or 0.9, 0.09 for decimals)
+    // and ensuring amounts are somewhat similar strings (anagrams)
     if (diff % 0.09 < 0.001 || diff % 0.9 < 0.001 || diff % 9 === 0) {
        // Convert to string and sort digits to see if they are anagrams
        const s1 = amount1.toFixed(2).replace('.', '').split('').sort().join('');
@@ -139,8 +139,6 @@ export const runReconciliation = (bankData: BankRecord[], bookData: BookRecord[]
   
   // 1. Exact Match Strategy: Invoice Number (Bank) === Description (Book)
   bankData.forEach((bankItem, bankIdx) => {
-    let matchedBookIndex = -1;
-
     // Search in Book Data
     const bookIndex = bookData.findIndex((bookItem, idx) => {
       if (matchedBookIndices.has(idx)) return false;
@@ -148,7 +146,6 @@ export const runReconciliation = (bankData: BankRecord[], bookData: BookRecord[]
     });
 
     if (bookIndex !== -1) {
-      matchedBookIndex = bookIndex;
       matchedBookIndices.add(bookIndex);
       matchedBankIndices.add(bankIdx);
       const matchedBook = bookData[bookIndex];
@@ -194,60 +191,70 @@ export const runReconciliation = (bankData: BankRecord[], bookData: BookRecord[]
                 bookRecord: bookData[bookIndex],
                 status: MatchStatus.MATCHED, // Inferred Match
                 amountDifference: 0,
-                notes: 'Matched by Amount and Date (Invoice ID mismatch)'
+                notes: 'Inferred match by Date & Amount'
             });
         }
   });
 
-  // 3. Add remaining Unmatched Bank
+  // 3. Identify Unmatched Bank
   bankData.forEach((bankItem, idx) => {
-      if (!matchedBankIndices.has(idx)) {
-          results.push({
-            id: crypto.randomUUID(),
-            bankRecord: bankItem,
-            status: MatchStatus.UNMATCHED_BANK,
-            amountDifference: bankItem.total_amount * -1
-        });
-      }
-  });
-
-  // 4. Add remaining Unmatched Book
-  bookData.forEach((bookItem, index) => {
-    if (!matchedBookIndices.has(index)) {
+    if (!matchedBankIndices.has(idx)) {
       results.push({
         id: crypto.randomUUID(),
-        bookRecord: bookItem,
-        status: MatchStatus.UNMATCHED_BOOK,
-        amountDifference: bookItem.amount
+        bankRecord: bankItem,
+        status: MatchStatus.UNMATCHED_BANK,
+        amountDifference: bankItem.total_amount
       });
     }
   });
 
-  // 5. Run Smart Fix Analysis
-  // Get all currently unmatched bank records to search against
-  const unmatchedBanks = results
+  // 4. Identify Unmatched Book
+  bookData.forEach((bookItem, idx) => {
+    if (!matchedBookIndices.has(idx)) {
+      results.push({
+        id: crypto.randomUUID(),
+        bookRecord: bookItem,
+        status: MatchStatus.UNMATCHED_BOOK,
+        amountDifference: -bookItem.amount
+      });
+    }
+  });
+
+  // 5. Apply Smart Fixes
+  const unmatchedBankRecords = results
     .filter(r => r.status === MatchStatus.UNMATCHED_BANK && r.bankRecord)
     .map(r => r.bankRecord!);
-
-  results = applySmartFixes(results, unmatchedBanks);
+    
+  results = applySmartFixes(results, unmatchedBankRecords);
 
   return results;
 };
 
 export const calculateSummary = (results: ReconResult[]): ReconSummary => {
-    const matched = results.filter(r => r.status === MatchStatus.MATCHED);
-    const variance = results.filter(r => r.status === MatchStatus.VARIANCE);
-    const orphanBank = results.filter(r => r.status === MatchStatus.UNMATCHED_BANK);
-    const orphanBook = results.filter(r => r.status === MatchStatus.UNMATCHED_BOOK);
+  const totalBank = results.filter(r => r.bankRecord).length;
+  const totalBook = results.filter(r => r.bookRecord).length;
+  
+  const matchedCount = results.filter(r => r.status === MatchStatus.MATCHED).length;
+  const varianceCount = results.filter(r => r.status === MatchStatus.VARIANCE).length;
+  const unmatchedBankCount = results.filter(r => r.status === MatchStatus.UNMATCHED_BANK).length;
+  const unmatchedBookCount = results.filter(r => r.status === MatchStatus.UNMATCHED_BOOK).length;
 
-    return {
-        totalBank: results.filter(r => r.bankRecord).length,
-        totalBook: results.filter(r => r.bookRecord).length,
-        matchedCount: matched.length,
-        varianceCount: variance.length,
-        unmatchedBankCount: orphanBank.length,
-        unmatchedBookCount: orphanBook.length,
-        matchRate: (matched.length / results.length) * 100,
-        totalVarianceAmount: variance.reduce((acc, curr) => acc + Math.abs(curr.amountDifference), 0)
-    };
+  const totalVarianceAmount = results
+    .filter(r => r.status === MatchStatus.VARIANCE)
+    .reduce((sum, r) => sum + Math.abs(r.amountDifference), 0);
+
+  const totalItems = totalBank + totalBook; // Approximate simple denominator
+  // Or match rate based on transactions processed
+  const matchRate = totalItems > 0 ? ((matchedCount * 2) / totalItems) * 100 : 0;
+
+  return {
+    totalBank,
+    totalBook,
+    matchedCount,
+    varianceCount,
+    unmatchedBankCount,
+    unmatchedBookCount,
+    matchRate,
+    totalVarianceAmount
+  };
 };

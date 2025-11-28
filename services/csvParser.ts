@@ -20,7 +20,6 @@ const parseDate = (dateStr: string): Date => {
 
 // Robust CSV Line Splitter that handles quoted commas
 const splitCSVLine = (line: string): string[] => {
-  const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
   // Fallback if simple regex fails (e.g. empty fields), use a more complex split
   // For the specific provided data, a simple lookahead split usually works:
   // Split by comma NOT inside quotes

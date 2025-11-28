@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Upload, FileText, Check, AlertCircle, Play, BarChart3, Database, FileCheck, RefreshCw, Sparkles, Loader2 } from 'lucide-react';
+import { FileText, Check, AlertCircle, Play, Database, FileCheck, RefreshCw, Sparkles, Loader2 } from 'lucide-react';
 import { parseBankCSV, parseBookCSV } from './services/csvParser';
 import { runReconciliation, calculateSummary } from './services/reconEngine';
 import { generateReconAnalysis } from './services/geminiService';

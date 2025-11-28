@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ReconResult, MatchStatus } from '../types';
-import { CheckCircle, AlertTriangle, XCircle, Search, Sparkles, ArrowRight } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Search, Sparkles } from 'lucide-react';
 
 interface DetailsTableProps {
   data: ReconResult[];
