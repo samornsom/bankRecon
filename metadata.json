@@ -1,0 +1,5 @@
+{
+  "name": "FinRecon AI",
+  "description": "Intelligent financial reconciliation dashboard that automatically matches bank transactions with book records, highlights variances, and provides AI-powered analysis using Gemini.",
+  "requestFramePermissions": []
+}
